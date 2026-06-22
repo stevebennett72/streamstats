@@ -150,6 +150,7 @@ app.get('/api/auth/spotify/callback', async (req, res) => {
   const code = req.query.code || null;
   const creds = await getConfig('spotify_credentials');
   const client_id = creds ? creds.clientId : null;
+  const client_secret = creds ? creds.clientSecret : null;
   const protocol = req.headers.host.includes('localhost') || req.headers.host.includes('127.0.0.1') ? 'http' : 'https';
   const host = req.headers.host.replace('localhost', '127.0.0.1');
   const redirect_uri = `${protocol}://${host}/api/auth/spotify/callback`;
