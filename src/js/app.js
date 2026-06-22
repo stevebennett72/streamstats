@@ -330,11 +330,25 @@ function renderConnections() {
       isLive: true
     },
     {
-      id: 'lastfm',
+      id: 'tidal',
       name: 'Tidal',
       svgIcon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996 4.004 12l4.004-4.004L12.012 12l-4.004 4.004 4.004 4.004 4.004-4.004L12.012 12l4.004-4.004-4.004-4.004zM16.042 7.996l3.979-3.979L24 7.996l-3.979 3.979z"/></svg>`,
       color: '#000000',
       rgb: '0, 0, 0',
+      textColor: '#ffffff',
+      statusLabel: tidalStatusLabel,
+      statusClass: tidalStatusClass,
+      btnText: tidalBtnText,
+      btnClass: tidalBtnClass,
+      desc: tidalDesc,
+      isLive: true
+    },
+    {
+      id: 'lastfm',
+      name: 'Last.fm',
+      icon: 'lastfm-fill',
+      color: '#d51007',
+      rgb: '213, 16, 7',
       textColor: '#ffffff',
       statusLabel: lastfmStatusLabel,
       statusClass: lastfmStatusClass,
