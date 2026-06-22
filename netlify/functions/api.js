@@ -4,20 +4,22 @@ import cors from 'cors';
 import axios from 'axios';
 import crypto from 'crypto';
 import admin from 'firebase-admin';
+import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Initialize Firebase Admin (Only once in serverless execution environment)
-if (!admin.apps.length) {
+if (getApps().length === 0) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+    initializeApp({
+      credential: cert(serviceAccount)
     });
   } catch (err) {
     console.error('Failed to initialize Firebase Admin. Please ensure FIREBASE_SERVICE_ACCOUNT is set correctly in Netlify.');
   }
 }
 
-const db = admin.apps.length ? admin.firestore() : null;
+const db = getApps().length > 0 ? getFirestore() : null;
 
 // In memory store for PKCE verifiers (Note: in a true serverless environment across multiple instances, 
 // this could fail if the callback hits a different lambda instance. We will keep it for simplicity as Netlify functions 
