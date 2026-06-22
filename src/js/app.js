@@ -409,7 +409,7 @@ function renderConnections() {
           <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:auto;">
             <input type="text" id="${p.id}-client-id" class="text-input" placeholder="${p.apiKeyPlaceholder || 'Client ID'}" style="font-size:0.8rem; padding:0.5rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white;">
             <input type="${p.secretType || 'password'}" id="${p.id}-client-secret" class="text-input" placeholder="${p.apiSecretPlaceholder || 'Client Secret'}" style="font-size:0.8rem; padding:0.5rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white;">
-            <button class="platform-connect-btn save-config-btn" data-platform="${p.id}" style="width: 100%; justify-content: center; background: rgba(var(--p-color-rgb), 0.2); color: var(--p-color);">
+            <button class="platform-connect-btn save-config-btn" data-platform="${p.id}" style="width: 100%; justify-content: center; background: rgba(var(--p-color-rgb), 0.2); color: var(--p-text-color);">
               <i class="ri-save-line"></i>
               <span>Save Configuration</span>
             </button>
