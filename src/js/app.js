@@ -494,7 +494,7 @@ function renderConnections() {
                 showImportFeedback(`Connection failed: ${syncRes.error}`, 'rgba(239, 68, 68, 0.15)', '#ef4444');
               }
             } else {
-              window.location.href = `http://localhost:3005/api/auth/${plat}`;
+              window.location.href = `/api/auth/${plat}`;
             }
           } else {
             alert(`Please configure your ${plat.toUpperCase()} API details first.`);
