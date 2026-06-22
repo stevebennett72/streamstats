@@ -121,12 +121,13 @@ async function saveHistoryItems(newPlays) {
 // ----------------------------------------
 
 app.get('/api/auth/spotify', async (req, res) => {
-  const client_id = process.env.SPOTIFY_CLIENT_ID;
+  const creds = await getConfig('spotify_credentials');
+  const client_id = creds ? creds.clientId : null;
   // Use dynamically constructed redirect URI for Netlify environments
   const redirect_uri = `https://${req.headers.host}/api/auth/spotify/callback`;
   
   if (!client_id || client_id === 'YOUR_SPOTIFY_CLIENT_ID') {
-    return res.status(400).send('Please configure your SPOTIFY_CLIENT_ID in the Netlify environment variables.');
+    return res.status(400).send('Please configure your Spotify Client ID in the app dashboard.');
   }
 
   const scope = 'user-read-recently-played';
@@ -146,8 +147,9 @@ app.get('/api/auth/spotify', async (req, res) => {
 
 app.get('/api/auth/spotify/callback', async (req, res) => {
   const code = req.query.code || null;
-  const client_id = process.env.SPOTIFY_CLIENT_ID;
-  const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
+  const creds = await getConfig('spotify_credentials');
+  const client_id = creds ? creds.clientId : null;
+  const client_secret = creds ? creds.clientSecret : null;
   const redirect_uri = `https://${req.headers.host}/api/auth/spotify/callback`;
 
   try {
@@ -181,8 +183,9 @@ async function getActiveAccessToken() {
   if (!tokens) return null;
 
   if (Date.now() >= tokens.expires_at - 60000) {
-    const client_id = process.env.SPOTIFY_CLIENT_ID;
-    const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
+    const creds = await getConfig('spotify_credentials');
+    const client_id = creds ? creds.clientId : null;
+    const client_secret = creds ? creds.clientSecret : null;
 
     try {
       const response = await axios({
@@ -219,12 +222,13 @@ async function getActiveAccessToken() {
 // TIDAL OAUTH ROUTES
 // ----------------------------------------
 
-app.get('/api/auth/tidal', (req, res) => {
-  const client_id = process.env.TIDAL_CLIENT_ID;
+app.get('/api/auth/tidal', async (req, res) => {
+  const creds = await getConfig('tidal_credentials');
+  const client_id = creds ? creds.clientId : null;
   const redirect_uri = `https://${req.headers.host}/api/auth/tidal/callback`;
   
   if (!client_id || client_id === 'YOUR_TIDAL_CLIENT_ID') {
-    return res.status(400).send('Please configure your TIDAL_CLIENT_ID.');
+    return res.status(400).send('Please configure your Tidal Client ID in the app dashboard.');
   }
 
   const verifier = base64URLEncode(crypto.randomBytes(32));
@@ -250,8 +254,9 @@ app.get('/api/auth/tidal', (req, res) => {
 app.get('/api/auth/tidal/callback', async (req, res) => {
   const code = req.query.code || null;
   const state = req.query.state || null;
-  const client_id = process.env.TIDAL_CLIENT_ID;
-  const client_secret = process.env.TIDAL_CLIENT_SECRET;
+  const creds = await getConfig('tidal_credentials');
+  const client_id = creds ? creds.clientId : null;
+  const client_secret = creds ? creds.clientSecret : null;
   const redirect_uri = `https://${req.headers.host}/api/auth/tidal/callback`;
 
   const verifier = pkceStore[state];
@@ -293,8 +298,9 @@ async function getActiveTidalToken() {
   if (!tokens) return null;
 
   if (Date.now() >= tokens.expires_at - 60000) {
-    const client_id = process.env.TIDAL_CLIENT_ID;
-    const client_secret = process.env.TIDAL_CLIENT_SECRET;
+    const creds = await getConfig('tidal_credentials');
+    const client_id = creds ? creds.clientId : null;
+    const client_secret = creds ? creds.clientSecret : null;
 
     try {
       const response = await axios({
@@ -351,16 +357,18 @@ app.post('/api/config/:platform', async (req, res) => {
 app.get('/api/status', async (req, res) => {
   const spotifyTokens = await getTokens('spotify');
   const tidalTokens = await getTokens('tidal');
+  const spotifyCreds = await getConfig('spotify_credentials');
+  const tidalCreds = await getConfig('tidal_credentials');
   const lastfmCreds = await getConfig('lastfm_credentials');
 
   res.json({
     spotify: {
       connected: !!spotifyTokens,
-      configured: process.env.SPOTIFY_CLIENT_ID !== 'YOUR_SPOTIFY_CLIENT_ID' && !!process.env.SPOTIFY_CLIENT_ID
+      configured: !!spotifyCreds
     },
     tidal: {
       connected: !!tidalTokens,
-      configured: process.env.TIDAL_CLIENT_ID !== 'YOUR_TIDAL_CLIENT_ID' && !!process.env.TIDAL_CLIENT_ID
+      configured: !!tidalCreds
     },
     lastfm: {
       connected: !!lastfmCreds,
