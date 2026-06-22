@@ -123,8 +123,8 @@ async function saveHistoryItems(newPlays) {
 app.get('/api/auth/spotify', async (req, res) => {
   const creds = await getConfig('spotify_credentials');
   const client_id = creds ? creds.clientId : null;
-  // Use dynamically constructed redirect URI for Netlify environments
-  const redirect_uri = `https://${req.headers.host}/api/auth/spotify/callback`;
+  const protocol = req.headers.host.includes('localhost') ? 'http' : 'https';
+  const redirect_uri = `${protocol}://${req.headers.host}/api/auth/spotify/callback`;
   
   if (!client_id || client_id === 'YOUR_SPOTIFY_CLIENT_ID') {
     return res.status(400).send('Please configure your Spotify Client ID in the app dashboard.');
@@ -149,8 +149,8 @@ app.get('/api/auth/spotify/callback', async (req, res) => {
   const code = req.query.code || null;
   const creds = await getConfig('spotify_credentials');
   const client_id = creds ? creds.clientId : null;
-  const client_secret = creds ? creds.clientSecret : null;
-  const redirect_uri = `https://${req.headers.host}/api/auth/spotify/callback`;
+  const protocol = req.headers.host.includes('localhost') ? 'http' : 'https';
+  const redirect_uri = `${protocol}://${req.headers.host}/api/auth/spotify/callback`;
 
   try {
     const response = await axios({
@@ -225,7 +225,8 @@ async function getActiveAccessToken() {
 app.get('/api/auth/tidal', async (req, res) => {
   const creds = await getConfig('tidal_credentials');
   const client_id = creds ? creds.clientId : null;
-  const redirect_uri = `https://${req.headers.host}/api/auth/tidal/callback`;
+  const protocol = req.headers.host.includes('localhost') ? 'http' : 'https';
+  const redirect_uri = `${protocol}://${req.headers.host}/api/auth/tidal/callback`;
   
   if (!client_id || client_id === 'YOUR_TIDAL_CLIENT_ID') {
     return res.status(400).send('Please configure your Tidal Client ID in the app dashboard.');
@@ -257,7 +258,8 @@ app.get('/api/auth/tidal/callback', async (req, res) => {
   const creds = await getConfig('tidal_credentials');
   const client_id = creds ? creds.clientId : null;
   const client_secret = creds ? creds.clientSecret : null;
-  const redirect_uri = `https://${req.headers.host}/api/auth/tidal/callback`;
+  const protocol = req.headers.host.includes('localhost') ? 'http' : 'https';
+  const redirect_uri = `${protocol}://${req.headers.host}/api/auth/tidal/callback`;
 
   const verifier = pkceStore[state];
   if (!verifier) {
