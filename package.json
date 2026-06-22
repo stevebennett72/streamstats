@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx netlify dev",
-    "build": "vite build",
+    "build": "vite build && echo '/* /index.html 200' > dist/_redirects",
     "preview": "vite preview"
   },
   "dependencies": {
