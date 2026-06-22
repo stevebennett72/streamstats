@@ -15,7 +15,8 @@ if (getApps().length === 0) {
       credential: cert(serviceAccount)
     });
   } catch (err) {
-    console.error('Failed to initialize Firebase Admin. Please ensure FIREBASE_SERVICE_ACCOUNT is set correctly in Netlify.');
+    console.error('Failed to initialize Firebase Admin. Error:', err);
+    console.error('Please ensure FIREBASE_SERVICE_ACCOUNT is set correctly in Netlify.');
   }
 }
 
