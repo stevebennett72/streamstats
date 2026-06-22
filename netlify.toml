@@ -3,6 +3,10 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[dev]
+  command = "vite"
+  targetPort = 5173
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
