@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamStats - Collated Music Analytics Dashboard</title>
+  <!-- Google Fonts & Remix Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="logo">
+        <i class="ri-pulse-fill"></i>
+        <span>StreamStats</span>
+      </div>
+      
+      <nav style="flex:1;">
+        <ul class="nav-links">
+          <li class="nav-item active" data-target="dashboard">
+            <i class="ri-dashboard-line"></i>
+            <span>Dashboard</span>
+          </li>
+          <li class="nav-item" data-target="exclusions">
+            <i class="ri-user-unfollow-line"></i>
+            <span>Artist Exclusions</span>
+          </li>
+          <li class="nav-item" id="theme-toggle" style="margin-top: 2rem;">
+            <i class="ri-moon-line" id="theme-icon"></i>
+            <span>Toggle Theme</span>
+          </li>
+          <li class="nav-item" data-target="connections">
+            <i class="ri-links-line"></i>
+            <span>Connections</span>
+          </li>
+          <li class="nav-item" data-target="explorer">
+            <i class="ri-file-list-3-line"></i>
+            <span>Data Explorer</span>
+          </li>
+        </ul>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <button id="reset-app-btn" class="reset-btn">
+          <i class="ri-refresh-line"></i> Reset App Data
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Global Navigation / Filters Header -->
+      <header class="main-header">
+        <div class="header-title">
+          <h1 id="page-title">Dashboard Overview</h1>
+          <p id="page-subtitle">Aggregated listening history and statistics</p>
+        </div>
+        
+        <div class="controls-bar">
+          <!-- Time Range Selectors -->
+          <div class="time-selector">
+            <button class="time-btn" data-time="7days">7D</button>
+            <button class="time-btn" data-time="30days">30D</button>
+            <button class="time-btn" data-time="60days">60D</button>
+            <button class="time-btn active" data-time="all">All Time</button>
+            <select class="time-btn" id="year-filter-select" style="background:transparent; border:none; color:inherit; outline:none; cursor:pointer; font-family:inherit; padding-right: 0.5rem; -webkit-appearance: none; appearance: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+              <option value="" disabled selected>Year ▾</option>
+            </select>
+          </div>
+
+          <!-- Quick Platform Toggles -->
+          <div class="source-pills">
+            <button class="source-pill spotify active" data-platform="spotify">
+              <i class="ri-spotify-fill"></i> Spotify
+            </button>
+            <button class="source-pill lastfm active" data-platform="lastfm">
+              <i class="ri-music-fill"></i> Tidal
+            </button>
+            <button class="source-pill youtube_music active" data-platform="youtube_music">
+              <i class="ri-youtube-fill"></i> YT Music
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- View 1: Overview Dashboard -->
+      <div id="view-dashboard" class="view-container active">
+        <!-- Stats Cards Row -->
+        <section class="stats-grid">
+          <!-- Total Plays -->
+          <div class="card glow-purple">
+            <div class="card-title">
+              <span>Total Plays</span>
+              <i class="ri-play-list-2-line" style="color:var(--accent-primary);"></i>
+            </div>
+            <div id="stat-total-plays" class="card-value">-</div>
+            <div class="card-subtext">Across connected services</div>
+          </div>
+          
+          <!-- Unique Artists -->
+          <div class="card glow-purple">
+            <div class="card-title">
+              <span>Unique Artists</span>
+              <i class="ri-mic-line" style="color:var(--accent-secondary);"></i>
+            </div>
+            <div id="stat-unique-artists" class="card-value">-</div>
+            <div class="card-subtext">Filtered tracks excluded</div>
+          </div>
+
+          <!-- Total Duration -->
+          <div class="card glow-purple">
+            <div class="card-title">
+              <span>Listening Time</span>
+              <i class="ri-time-line" style="color:var(--accent-tertiary);"></i>
+            </div>
+            <div id="stat-total-time" class="card-value">- min</div>
+            <div class="card-subtext">Rounded to nearest minute</div>
+          </div>
+
+          <!-- Kids Excluded Stats -->
+          <div class="card glow-purple">
+            <div class="card-title">
+              <span>Exclusions Impact</span>
+              <i class="ri-shield-user-line" style="color:#ef4444;"></i>
+            </div>
+            <div id="stat-excluded-plays" class="card-value">-</div>
+            <div class="card-subtext">
+              Filtered: <span id="stat-excluded-time" class="saving">- min</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Charts Row -->
+        <section class="visuals-row">
+          <!-- History Timeline -->
+          <div class="card chart-card">
+            <div class="card-title">
+              <span>Listening History Timeline</span>
+              <i class="ri-line-chart-line"></i>
+            </div>
+            <div id="timeline-chart-container" class="chart-container"></div>
+          </div>
+
+          <!-- Platform Distribution -->
+          <div class="card chart-card">
+            <div class="card-title">
+              <span>Platform Share</span>
+              <i class="ri-pie-chart-line"></i>
+            </div>
+            <div id="platform-chart-container" class="chart-container"></div>
+          </div>
+        </section>
+
+        <!-- Lists Row -->
+        <section class="details-row">
+          <!-- Top Tracks -->
+          <div class="card list-card">
+            <div class="list-header">
+              <h3>Top Tracks</h3>
+              <i class="ri-music-2-line" style="color:var(--accent-secondary);"></i>
+            </div>
+            <div id="top-tracks-list" class="list-container"></div>
+          </div>
+
+          <!-- Top Genres -->
+          <div class="card list-card">
+            <div class="list-header">
+              <h3>Top Genres</h3>
+              <i class="ri-disc-line" style="color:var(--accent-tertiary);"></i>
+            </div>
+            <div id="top-genres-list" class="list-container"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- View 2: Exclusions View -->
+      <div id="view-exclusions" class="view-container">
+        <div class="exclusion-split">
+          <!-- Left: Exclude Add Form & Recommendations -->
+          <div style="display:flex; flex-direction:column; gap:1.5rem;">
+            <div class="card">
+              <h3 style="margin-bottom:1rem;">Add Artist Exclusion</h3>
+              <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem;">
+                Exclude kids artists or other profiles to completely scrub their streams from charts and summary calculations.
+              </p>
+              
+              <form id="exclusion-form" onsubmit="event.preventDefault();">
+                <div class="form-group">
+                  <label class="form-label" for="exclude-artist-input">Artist Name</label>
+                  <div class="search-input-wrapper">
+                    <i class="ri-music-fill"></i>
+                    <input type="text" id="exclude-artist-input" class="text-input" placeholder="e.g. Cocomelon" required>
+                  </div>
+                </div>
+                <button type="submit" class="primary-btn" style="width:100%;">
+                  <i class="ri-prohibit-line"></i> Exclude Artist
+                </button>
+              </form>
+            </div>
+
+            <!-- Smart Auto-Excludes recommendations -->
+            <div class="suggestions-box">
+              <div class="suggestions-title">
+                <i class="ri-magic-line"></i>
+                <span>Kids Content Detected</span>
+              </div>
+              <p class="suggestions-desc">
+                We've scanned your Spotify connection and detected common kids/children profiles. Click below to bulk-exclude:
+              </p>
+              <div id="suggestions-list-container" class="suggestions-list">
+                <!-- Badges will be generated here -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: List of Excluded Artists -->
+          <div class="card" style="display:flex; flex-direction:column; min-height:400px;">
+            <div class="list-header" style="margin-bottom: 1.5rem;">
+              <div>
+                <h3>Excluded Artists</h3>
+                <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:0.25rem;">
+                  These artists are currently excluded from all stats calculations.
+                </p>
+              </div>
+              <span id="exclusions-count-badge" class="platform-status connected" style="background:rgba(139, 92, 246, 0.15); color:var(--accent-primary);">0 Excluded</span>
+            </div>
+            
+            <div id="blocked-artists-container" class="blocked-grid">
+              <!-- Blocked list cards -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View 3: Connections View -->
+      <div id="view-connections" class="view-container">
+        <!-- Platform connections list -->
+        <section class="platforms-grid" id="platforms-grid-container">
+          <!-- JavaScript will populate active platform configurations here -->
+        </section>
+
+        <!-- Import Section -->
+        <section class="card import-section">
+          <h3>Import JSON History Export</h3>
+          <p style="color:var(--text-secondary); font-size:0.9rem;">
+            Have historical stats files? Drop in your spotify listening JSON history or any valid tracks array to merge with HarmonyStats.
+          </p>
+          
+          <div id="dropzone" class="dropzone-card">
+            <i class="ri-upload-cloud-2-line"></i>
+            <div>
+              <p style="font-weight:600;">Drag and drop JSON export file here</p>
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">or click to browse local files</p>
+            </div>
+            <input type="file" id="file-input" class="file-input-hidden" accept=".json">
+          </div>
+          
+          <div id="import-feedback" style="display:none; padding:1rem; border-radius:12px; font-weight:500;"></div>
+        </section>
+      </div>
+
+      <!-- View 4: Data Explorer -->
+      <div id="view-explorer" class="view-container">
+        <div class="card table-card">
+          <div class="table-controls">
+            <div class="search-input-wrapper table-search">
+              <i class="ri-search-line"></i>
+              <input type="text" id="table-search-input" class="text-input" placeholder="Search track, artist, or album...">
+            </div>
+            
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+              Showing active items. Kids music items and excluded artists appear crossed out.
+            </div>
+          </div>
+
+          <div id="explorer-active-filters" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;"></div>
+
+          <div class="table-wrapper">
+            <table class="explorer-table">
+              <thead>
+                <tr>
+                  <th>Platform</th>
+                  <th>Track Name</th>
+                  <th>Artist</th>
+                  <th>Album</th>
+                  <th style="width: 100px;">Listen</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody id="explorer-table-body">
+                <!-- Javascript fills table rows dynamically -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-controls">
+            <button id="prev-page-btn" class="page-btn" disabled><i class="ri-arrow-left-s-line"></i> Previous</button>
+            <span id="page-number-indicator" class="page-info">Page 1 of 1</span>
+            <button id="next-page-btn" class="page-btn" disabled>Next <i class="ri-arrow-right-s-line"></i></button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Main JavaScript App module -->
+  <script type="module" src="./src/js/app.js"></script>
+</body>
+</html>
