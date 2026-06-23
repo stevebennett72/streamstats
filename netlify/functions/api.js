@@ -3,7 +3,6 @@ import serverless from 'serverless-http';
 import cors from 'cors';
 import axios from 'axios';
 import crypto from 'crypto';
-import admin from 'firebase-admin';
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -22,9 +21,7 @@ if (getApps().length === 0) {
 
 const db = getApps().length > 0 ? getFirestore() : null;
 
-// In memory store for PKCE verifiers (Note: in a true serverless environment across multiple instances, 
-// this could fail if the callback hits a different lambda instance. We will keep it for simplicity as Netlify functions 
-// usually reuse instances for back-to-back requests).
+// In memory store for PKCE verifiers
 let pkceStore = {};
 
 function base64URLEncode(str) {
@@ -37,9 +34,10 @@ function sha256(buffer) {
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Firebase Config Helpers
+// Database Config Helpers
 async function getConfig(key) {
   if (!db) return null;
   try {
@@ -50,16 +48,25 @@ async function getConfig(key) {
   }
 }
 
-async function saveConfig(key, data) {
+async function saveConfig(key, value) {
   if (!db) return;
-  await db.collection('config').doc(key).set(data, { merge: true });
+  try {
+    await db.collection('config').doc(key).set(value, { merge: true });
+  } catch (err) {
+    console.error(`Error saving config ${key}:`, err);
+  }
 }
 
 async function deleteConfig(key) {
   if (!db) return;
-  await db.collection('config').doc(key).delete();
+  try {
+    await db.collection('config').doc(key).delete();
+  } catch (err) {
+    console.error(`Error deleting config ${key}:`, err);
+  }
 }
 
+// Database History Helpers
 async function getTokens(provider = 'spotify') {
   return await getConfig(`${provider}_tokens`);
 }
@@ -68,13 +75,19 @@ async function saveTokens(tokens, provider = 'spotify') {
   await saveConfig(`${provider}_tokens`, tokens);
 }
 
+// History uses chunking to drastically reduce Firestore Document reads/writes
 async function getHistory() {
   if (!db) return [];
   try {
-    const snapshot = await db.collection('history').orderBy('timestamp', 'asc').get();
-    const history = [];
-    snapshot.forEach(doc => history.push(doc.data()));
-    return history;
+    const snapshot = await db.collection('history_chunks').get();
+    let history = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.plays && Array.isArray(data.plays)) {
+        history = history.concat(data.plays);
+      }
+    });
+    return history.sort((a, b) => a.timestamp - b.timestamp);
   } catch (err) {
     console.error('Error fetching history from Firestore:', err);
     return [];
@@ -82,36 +95,46 @@ async function getHistory() {
 }
 
 async function saveHistoryItems(newPlays) {
-  if (!db) return 0;
-  let addedCount = 0;
+  if (!db || !newPlays || newPlays.length === 0) return 0;
   try {
-    // We should use a batch, but Firestore limits to 500 writes per batch.
-    // For simplicity, we'll write individually with a check, or query existing ids.
-    // Given the scale, fetching recent history to check ids might be better.
+    // 1. Fetch existing chunks
+    const snapshot = await db.collection('history_chunks').get();
+    let allPlaysMap = new Map();
     
-    const batch = db.batch();
-    let currentBatchSize = 0;
-    
-    // Just blindly write them. If ID is the doc name, it will just overwrite duplicates perfectly!
-    for (const play of newPlays) {
-      const docRef = db.collection('history').doc(play.id);
-      batch.set(docRef, play, { merge: true }); // Merge ensures we just overwrite identical IDs
-      addedCount++;
-      currentBatchSize++;
-      
-      if (currentBatchSize >= 490) {
-        await batch.commit();
-        currentBatchSize = 0;
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.plays) {
+        data.plays.forEach(play => allPlaysMap.set(play.id, play));
       }
+    });
+    
+    const initialSize = allPlaysMap.size;
+    
+    // 2. Add/merge new plays
+    newPlays.forEach(play => {
+      allPlaysMap.set(play.id, play);
+    });
+    
+    const addedCount = allPlaysMap.size - initialSize;
+    if (addedCount === 0) return 0;
+    
+    const allPlaysArray = Array.from(allPlaysMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+    
+    // 3. Chunk into groups of 2000 to save reads
+    const CHUNK_SIZE = 2000;
+    const batch = db.batch();
+    
+    for (let i = 0; i < allPlaysArray.length; i += CHUNK_SIZE) {
+      const chunk = allPlaysArray.slice(i, i + CHUNK_SIZE);
+      const chunkId = `chunk_${Math.floor(i / CHUNK_SIZE)}`;
+      const docRef = db.collection('history_chunks').doc(chunkId);
+      batch.set(docRef, { plays: chunk });
     }
     
-    if (currentBatchSize > 0) {
-      await batch.commit();
-    }
-    
+    await batch.commit();
     return addedCount;
   } catch (err) {
-    console.error('Error saving history to Firestore:', err);
+    console.error('Error saving history chunks to Firestore:', err);
     return 0;
   }
 }

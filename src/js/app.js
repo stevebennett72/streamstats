@@ -117,13 +117,38 @@ function renderDashboard() {
   document.getElementById('stat-excluded-plays').innerText = stats.excludedPlayCount.toLocaleString();
   document.getElementById('stat-excluded-time').innerText = `${stats.excludedMinutes.toLocaleString()} min`;
 
+  // Global variable for tracking how many tracks to show
+  if (typeof window.topTracksLimit === 'undefined') {
+    window.topTracksLimit = 10;
+  }
+
+  window.loadMoreTracks = () => {
+    window.topTracksLimit += 10;
+    renderActiveView(); // re-render with higher limit
+  };
+
+  window.openTrack = (platform, title, artist) => {
+    const query = encodeURIComponent(`${title} ${artist}`);
+    let url = '#';
+    if (platform === 'spotify') {
+      url = `https://open.spotify.com/search/${query}`;
+    } else if (platform === 'tidal') {
+      url = `https://listen.tidal.com/search?q=${query}`;
+    } else if (platform === 'youtube_music') {
+      url = `https://music.youtube.com/search?q=${query}`;
+    }
+    if (url !== '#') {
+      window.open(url, '_blank');
+    }
+  };
+
   // Top Tracks List
   const tracksContainer = document.getElementById('top-tracks-list');
   if (stats.topTracks.length === 0) {
     tracksContainer.innerHTML = '<div class="empty-state" style="padding:2rem;">No plays recorded</div>';
   } else {
-    tracksContainer.innerHTML = stats.topTracks.slice(0, 10).map((track, i) => `
-      <div class="list-item">
+    let tracksHtml = stats.topTracks.slice(0, window.topTracksLimit).map((track, i) => `
+      <div class="list-item" style="cursor: pointer;" onclick="window.openTrack('${track.platform}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}')">
         <div class="item-left">
           <span class="item-index">${i + 1}</span>
           <div class="item-details">
@@ -140,6 +165,18 @@ function renderDashboard() {
         </div>
       </div>
     `).join('');
+
+    if (stats.topTracks.length > window.topTracksLimit) {
+      tracksHtml += `
+        <div style="display:flex; justify-content:center; margin-top: 1rem;">
+          <button class="btn btn-outline" onclick="window.loadMoreTracks()" style="font-size: 0.9rem; padding: 0.5rem 1.5rem;">
+            Load More Tracks
+          </button>
+        </div>
+      `;
+    }
+    
+    tracksContainer.innerHTML = tracksHtml;
   }
 
   // Top Genres List
@@ -250,15 +287,22 @@ exclusionForm.addEventListener('submit', (e) => {
 // RENDER VIEW: CONNECTIONS
 // ----------------------------------------
 function renderConnections() {
-  const connected = state.getConnectedPlatforms();
+  const container = document.getElementById('platforms-grid-container');
   const bStatus = state.getBackendStatus();
+  const connected = state.getConnectedPlatforms();
   const history = state.getFilteredListeningHistory();
   
+  // Preserve existing user input text to prevent wiping during background polling
+  const existingInputs = {};
+  if (container) {
+    container.querySelectorAll('input.text-input').forEach(input => {
+      existingInputs[input.id] = input.value;
+    });
+  }
+
   // Platform play count breakdown
   const counts = { spotify: 0, tidal: 0, youtube_music: 0, lastfm: 0 };
   history.forEach(i => counts[i.platform]++);
-
-  const container = document.getElementById('platforms-grid-container');
 
   // Spotify live connectivity description
   let spotifyDesc = 'Provides live synchronization of your listening history using Spotify Web API.';
@@ -325,9 +369,9 @@ function renderConnections() {
       desc: 'Connect your Spotify account to sync your entire listening history and top artists.',
       statusLabel: spotifyStatusLabel,
       statusClass: spotifyStatusClass,
-      btnText: spotifyBtnText,
       btnClass: spotifyBtnClass,
-      isLive: true
+      isLive: true,
+      hasUploadOption: true
     },
     {
       id: 'lastfm',
@@ -393,14 +437,21 @@ function renderConnections() {
             </div>
           </div>
           
-          <div style="display:flex; gap:0.5rem; margin-top:auto;">
+          <div style="display:flex; gap:0.5rem; margin-top:auto; align-items: center;">
             <button class="platform-connect-btn ${p.btnClass}" data-platform="${p.id}" data-action="${p.requiresUpload ? 'upload' : 'connect'}">
               <i class="ri-${p.requiresUpload ? 'upload-cloud-2-line' : (isConnected ? 'refresh-line' : 'links-line')}"></i>
               <span>${p.btnText}</span>
             </button>
-            ${p.requiresUpload ? `<input type="file" id="${p.id}-upload-input" accept=".json" style="display: none;">` : ''}
+            ${(p.requiresUpload || p.hasUploadOption) ? `<input type="file" id="${p.id}-upload-input" accept=".json" style="display: none;">` : ''}
+            
+            ${(p.hasUploadOption && isConfigured) ? `
+              <button class="platform-connect-btn upload-action" data-platform="${p.id}" data-action="upload" title="Import GDPR History JSON" style="padding: 0.5rem 0.75rem; width: auto; background: rgba(255,255,255,0.1);">
+                <i class="ri-upload-cloud-2-line"></i>
+              </button>
+            ` : ''}
+
             ${p.isLive && !p.requiresUpload && isConnected ? `
-              <button class="platform-connect-btn disconnect-action" data-platform="${p.id}" data-action="disconnect" style="padding: 0.5rem 1rem; width: auto;">
+              <button class="platform-connect-btn disconnect-action" data-platform="${p.id}" data-action="disconnect" style="padding: 0.5rem 1rem; width: auto; margin-left: auto;">
                 <i class="ri-shut-down-line"></i>
               </button>
             ` : ''}
@@ -418,6 +469,12 @@ function renderConnections() {
       </div>
     `;
   }).join('');
+
+  // Restore existing user input text
+  Object.keys(existingInputs).forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = existingInputs[id];
+  });
 
   // Wire config save actions
   container.querySelectorAll('.save-config-btn').forEach(btn => {
@@ -517,31 +574,63 @@ function renderConnections() {
       reader.onload = async (event) => {
         try {
           const data = JSON.parse(event.target.result);
-          // Filter for YouTube Music
-          const ytMusicPlays = data.filter(item => item.header === 'YouTube Music' || (item.products && item.products.includes('YouTube Music')));
+          let formattedPlays = [];
           
-          if (ytMusicPlays.length === 0) {
-            showImportFeedback('No YouTube Music history found in this file.', 'rgba(239, 68, 68, 0.15)', '#ef4444');
-            return;
+          if (plat === 'youtube_music') {
+            const ytMusicPlays = data.filter(item => item.header === 'YouTube Music' || (item.products && item.products.includes('YouTube Music')));
+            if (ytMusicPlays.length === 0) {
+              showImportFeedback('No YouTube Music history found in this file.', 'rgba(239, 68, 68, 0.15)', '#ef4444');
+              return;
+            }
+            formattedPlays = ytMusicPlays.map(item => {
+              let trackName = item.title;
+              if (trackName && trackName.startsWith('Watched ')) trackName = trackName.substring(8);
+              const artistName = (item.subtitles && item.subtitles.length > 0) ? item.subtitles[0].name : 'Unknown Artist';
+              const timestamp = new Date(item.time).getTime();
+              return {
+                id: `ytmusic-${timestamp}`,
+                trackName: trackName || 'Unknown Track',
+                artistName: artistName,
+                albumName: 'Unknown Album',
+                durationMs: 0,
+                timestamp: timestamp,
+                platform: 'youtube_music',
+                genres: ['Unknown']
+              };
+            });
+          } else if (plat === 'spotify') {
+            const isSpotify = data.length > 0 && (data[0].endTime || data[0].ts);
+            if (!isSpotify) {
+              showImportFeedback('No Spotify history found in this file.', 'rgba(239, 68, 68, 0.15)', '#ef4444');
+              return;
+            }
+            formattedPlays = data.map(item => {
+              const ts = item.endTime || item.ts || item.time || new Date().toISOString();
+              const timestamp = new Date(ts).getTime();
+              
+              // Handle podcasts and various key formats
+              const trackName = item.trackName || item.master_metadata_track_name || item.track_name || item.episode_name || item.name || 'Unknown Track';
+              const artistName = item.artistName || item.master_metadata_album_artist_name || item.artist_name || item.episode_show_name || item.artist || 'Unknown Artist';
+              const albumName = item.albumName || item.master_metadata_album_album_name || item.album_name || item.album || 'Unknown Album';
+              const durationMs = item.msPlayed || item.ms_played || item.duration_ms || item.duration || 0;
+              
+              // Generate a deterministic ID so re-uploads overwrite instead of duplicate
+              const cleanArtist = artistName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
+              const cleanTrack = trackName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
+              const id = `spotify-import-${timestamp}-${cleanArtist}-${cleanTrack}`;
+
+              return {
+                id: id,
+                trackName: trackName,
+                artistName: artistName,
+                albumName: albumName,
+                durationMs: durationMs,
+                timestamp: timestamp,
+                platform: 'spotify',
+                genres: ['Unknown']
+              };
+            });
           }
-          
-          const formattedPlays = ytMusicPlays.map(item => {
-            let trackName = item.title;
-            if (trackName && trackName.startsWith('Watched ')) trackName = trackName.substring(8);
-            const artistName = (item.subtitles && item.subtitles.length > 0) ? item.subtitles[0].name : 'Unknown Artist';
-            const timestamp = new Date(item.time).getTime();
-            
-            return {
-              id: `ytmusic-${timestamp}`,
-              trackName: trackName || 'Unknown Track',
-              artistName: artistName,
-              albumName: 'Unknown Album',
-              durationMs: 0,
-              timestamp: timestamp,
-              platform: 'youtube_music',
-              genres: ['Unknown']
-            };
-          });
           
           showImportFeedback(`Found ${formattedPlays.length} tracks. Uploading...`, 'rgba(255, 255, 255, 0.1)', '#fff');
           const res = await state.syncManualUpload(plat, formattedPlays);
@@ -721,7 +810,7 @@ function renderExplorer() {
           <td>${escapeHTML(item.artistName)}</td>
           <td style="color:var(--text-secondary);">${escapeHTML(item.albumName)}</td>
           <td><div style="display:flex; align-items:center;">${links.join('')}</div></td>
-          <td>${formatDuration(item.durationMs)}</td>
+          <td>${new Date(item.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
         </tr>
       `;
     }).join('');
@@ -834,6 +923,11 @@ function renderActiveView() {
   } else if (activeView === 'exclusions') {
     renderExclusions();
   } else if (activeView === 'connections') {
+    // Check if user is actively typing in an input field to prevent focus-stealing
+    const activeEl = document.activeElement;
+    if (activeEl && activeEl.tagName === 'INPUT' && activeEl.closest('#view-connections')) {
+      return;
+    }
     renderConnections();
   } else if (activeView === 'explorer') {
     renderExplorer();
@@ -879,7 +973,7 @@ if (window.location.hash === '#connected') {
   });
 
   // Start polling backend status
-  setInterval(state.initBackend, 10000);
+  setInterval(state.initBackend, 60000);
 
 // Load Backend Data
 state.initBackend().then(() => {

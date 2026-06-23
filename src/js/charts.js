@@ -93,10 +93,14 @@ export function renderTimelineChart(containerId, history, filterType) {
 
   // Fill data
   history.forEach(play => {
-    const dateStr = play.timestamp.split('T')[0];
-    if (dateStr in dateCounts) {
-      dateCounts[dateStr].total++;
-      dateCounts[dateStr][play.platform]++;
+    // Safely handle both ISO strings from mock data and numeric timestamps from Firebase
+    const d = new Date(play.timestamp);
+    if (!isNaN(d.getTime())) {
+      const dateStr = d.toISOString().split('T')[0];
+      if (dateStr in dateCounts) {
+        dateCounts[dateStr].total++;
+        dateCounts[dateStr][play.platform]++;
+      }
     }
   });
 

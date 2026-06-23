@@ -48,16 +48,18 @@ export function subscribe(callback) {
 }
 
 // Initialize Backend Connection
-export async function initBackend() {
+export async function initBackend(forceHistoryFetch = false) {
   try {
     const resStatus = await fetch(`${API_URL}/status`);
     if (resStatus.ok) {
       backendStatus = await resStatus.json();
     }
     
-    const resHist = await fetch(`${API_URL}/history`);
-    if (resHist.ok) {
-      backendHistory = await resHist.json();
+    if (forceHistoryFetch || backendHistory.length === 0) {
+      const resHist = await fetch(`${API_URL}/history`);
+      if (resHist.ok) {
+        backendHistory = await resHist.json();
+      }
     }
     notifyStateChange();
   } catch (err) {
@@ -376,6 +378,9 @@ export function getFilteredListeningHistory() {
       const year = parseInt(activeTimeFilter.split('-')[1], 10);
       if (itemDate.getFullYear() !== year) return false;
     }
+
+    // 4. Duration filter (industry standard 30-second minimum for a stream to count)
+    if (item.durationMs < 30000) return false;
 
     return true;
   });
